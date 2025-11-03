@@ -17,6 +17,23 @@ import (
 	_ "github.com/lib/pq"
 )
 
+func enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Разрешаем запросы с любого origin для разработки
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+
+		// Обрабатываем preflight OPTIONS запросы
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 
 	godotenv.Load()
@@ -52,6 +69,8 @@ func main() {
 	dbQueries := database.New(db)
 
 	mux := http.NewServeMux()
+	// Оберните ваш mux в CORS middleware
+	corsMux := enableCORS(mux)
 
 	config := &handlers.ApiConfig{
 		Db:        dbQueries,
@@ -68,7 +87,7 @@ func main() {
 		Addr:         ":" + helpers.ServerPort,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
-		Handler:      mux,
+		Handler:      corsMux,
 	}
 
 	// Используем структуру как http.Handler
